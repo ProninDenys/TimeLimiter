@@ -94,10 +94,14 @@ li {
   font-size: 14px;
 }
 
-.limitInfo {
+/* Новый блок с лимитом и оставшимся временем */
+.siteDetails {
+  display: flex;
+  flex-direction: column;
   font-size: 12px;
-  color: #aaa;
-  margin-top: 2px;
+  color: #bbb;
+  gap: 2px;
+  margin-top: 4px;
 }
 
 /* iOS-style switch */
@@ -151,19 +155,26 @@ input:checked + .slider:before {
   background-color: #6c63ff;
   color: white;
   border: none;
-  border-radius: 8px;
-  width: 28px;
-  height: 28px;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
   transition: background-color 0.3s ease;
   padding: 0;
+  margin-left: 4px;
 }
 
 .editBtn:hover {
   background-color: #574fcb;
 }
 
+/* Блок с переключателем и кнопкой ✎ */
+.siteActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

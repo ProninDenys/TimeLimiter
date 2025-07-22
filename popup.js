@@ -56,7 +56,7 @@ function updateList(limits, enabledMap) {
     </div>
     <div class="site-controls">
       <label class="switch">
-        <input type="checkbox" data-site="${site}" class="toggleSwitch" ${isDisabled ? "" : "checked"}>
+        <input type="checkbox" data-site="${site}" class="toggleSwitch" ${enabled ? "checked" : ""}
         <span class="slider"></span>
       </label>
       <button class="editBtn" data-site="${site}" data-time="${time}">✏️</button>
