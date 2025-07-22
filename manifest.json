@@ -3,7 +3,7 @@
   "name": "TimeLimiter — Control Your Web Time",
   "description": "Set daily time limits for websites like YouTube, Reddit, and more. Stay focused.",
   "version": "1.0",
-  "permissions": ["storage"],
+  "permissions": ["storage", "tabs"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",

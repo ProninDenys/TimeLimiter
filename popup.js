@@ -3,26 +3,39 @@ const timeInput = document.getElementById("timeInput");
 const addBtn = document.getElementById("addBtn");
 const siteList = document.getElementById("siteList");
 
-// Загрузка сохранённых лимитов при загрузке popup
+// Загрузка сохранённых лимитов
 chrome.storage.local.get(["siteLimits"], (result) => {
   const limits = result.siteLimits || {};
   updateList(limits);
 });
 
-// Обработка кнопки "Add Limit"
+// Преобразует ввод в origin (например, https://example.com)
+function normalizeSite(input) {
+  try {
+    if (!input.startsWith("http")) {
+      input = "https://" + input;
+    }
+    const url = new URL(input);
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+// Добавление нового лимита
 addBtn.addEventListener("click", () => {
-  const rawInput = siteInput.value.trim();
-  const domain = normalizeDomain(rawInput);
+  const raw = siteInput.value.trim();
+  const site = normalizeSite(raw);
   const time = parseInt(timeInput.value);
 
-  if (!domain || isNaN(time) || time <= 0) {
+  if (!site || isNaN(time) || time <= 0) {
     alert("Please enter a valid site and time (in minutes).");
     return;
   }
 
   chrome.storage.local.get(["siteLimits"], (result) => {
     const limits = result.siteLimits || {};
-    limits[domain] = time;
+    limits[site] = time;
     chrome.storage.local.set({ siteLimits: limits }, () => {
       updateList(limits);
       siteInput.value = "";
@@ -31,18 +44,17 @@ addBtn.addEventListener("click", () => {
   });
 });
 
-// Удаление лимита по кнопке ✕
+// Отображение списка лимитов
 function updateList(limits) {
   siteList.innerHTML = "";
   for (const [site, time] of Object.entries(limits)) {
     const li = document.createElement("li");
-    li.innerHTML = `
-      <span><strong>${site}</strong>: ${time} min</span>
+    li.innerHTML = `<span><strong>${site}</strong>: ${time} min</span>
       <button data-site="${site}" class="removeBtn">✕</button>`;
     siteList.appendChild(li);
   }
 
-  // Назначаем обработчики кнопкам удаления
+  // Кнопки удаления
   document.querySelectorAll(".removeBtn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const siteToRemove = e.target.dataset.site;
@@ -55,14 +67,4 @@ function updateList(limits) {
       });
     });
   });
-}
-
-// Функция для извлечения домена из ввода
-function normalizeDomain(raw) {
-  try {
-    const url = new URL(raw.startsWith("http") ? raw : "https://" + raw);
-    return url.hostname.replace(/^www\./, "");
-  } catch (e) {
-    return "";
-  }
 }
