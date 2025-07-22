@@ -1,11 +1,12 @@
+// popup.js — финальная рабочая версия
+
 const siteInput = document.getElementById("siteInput");
 const timeInput = document.getElementById("timeInput");
 const addBtn = document.getElementById("addBtn");
 const siteList = document.getElementById("siteList");
-
 let timerInterval;
 
-// Загружаем лимиты и статусы
+// Загрузка лимитов и состояния
 function loadLimits() {
   chrome.storage.local.get(["siteLimits", "siteEnabled"], (data) => {
     const limits = data.siteLimits || {};
@@ -14,7 +15,7 @@ function loadLimits() {
   });
 }
 
-// Добавляем новый лимит
+// Добавление лимита
 addBtn.addEventListener("click", () => {
   const raw = siteInput.value.trim();
   const site = raw.replace(/^https?:\/\//, "").split("/")[0];
@@ -30,7 +31,6 @@ addBtn.addEventListener("click", () => {
     const enabled = data.siteEnabled || {};
     limits[site] = time;
     enabled[site] = true;
-
     chrome.storage.local.set({ siteLimits: limits, siteEnabled: enabled }, () => {
       siteInput.value = "";
       timeInput.value = "";
@@ -39,7 +39,7 @@ addBtn.addEventListener("click", () => {
   });
 });
 
-// Обновление списка сайтов
+// Отрисовка списка сайтов
 function updateList(limits, enabledMap) {
   siteList.innerHTML = "";
 
@@ -48,21 +48,19 @@ function updateList(limits, enabledMap) {
 
     const li = document.createElement("li");
     li.innerHTML = `
-  <div class="site-block">
-    <div class="site-info">
-      <div><strong>${site}</strong></div>
-      <div class="limit-line">Limit: ${time} min</div>
-      <div class="limit-line" id="remaining-${site}">Left: ...</div>
-    </div>
-    <div class="site-controls">
-      <label class="switch">
-        <input type="checkbox" data-site="${site}" class="toggleSwitch" ${enabled ? "checked" : ""}
-        <span class="slider"></span>
-      </label>
-      <button class="editBtn" data-site="${site}" data-time="${time}">✏️</button>
-    </div>
-  </div>
-`;
+      <div class="siteInfo">
+        <div class="siteText">${site}</div>
+        <div class="limitInfo">Limit: ${time} min</div>
+        <div class="limitInfo countdown" data-site="${site}">Left: ...</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <label class="switch">
+          <input type="checkbox" class="toggleSwitch" data-site="${site}" ${enabled ? "checked" : ""}>
+          <span class="slider"></span>
+        </label>
+        <button class="editBtn" data-site="${site}" data-time="${time}">✎</button>
+      </div>
+    `;
     siteList.appendChild(li);
   }
 
@@ -70,11 +68,10 @@ function updateList(limits, enabledMap) {
   document.querySelectorAll(".toggleSwitch").forEach((toggle) => {
     toggle.addEventListener("change", (e) => {
       const site = e.target.dataset.site;
-      const isEnabled = e.target.checked;
-
-      chrome.storage.local.get("siteEnabled", (res) => {
-        const updated = res.siteEnabled || {};
-        updated[site] = isEnabled;
+      const value = e.target.checked;
+      chrome.storage.local.get("siteEnabled", (data) => {
+        const updated = data.siteEnabled || {};
+        updated[site] = value;
         chrome.storage.local.set({ siteEnabled: updated });
       });
     });
@@ -87,8 +84,8 @@ function updateList(limits, enabledMap) {
       const current = parseInt(e.target.dataset.time);
       const newTime = prompt(`Edit time limit for ${site} (min):`, current);
       if (newTime && !isNaN(parseInt(newTime))) {
-        chrome.storage.local.get("siteLimits", (result) => {
-          const limits = result.siteLimits || {};
+        chrome.storage.local.get("siteLimits", (data) => {
+          const limits = data.siteLimits || {};
           limits[site] = parseInt(newTime);
           chrome.storage.local.set({ siteLimits: limits }, () => {
             loadLimits();
@@ -98,12 +95,11 @@ function updateList(limits, enabledMap) {
     });
   });
 
-  // Обновляем таймер
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(updateTimers, 1000);
 }
 
-// Обновление таймера для всех сайтов
+// Обновление таймера
 function updateTimers() {
   document.querySelectorAll(".countdown").forEach((span) => {
     const site = span.dataset.site;
@@ -116,12 +112,10 @@ function updateTimers() {
         const remaining = Math.max(0, limitMin * 60 * 1000 - used);
         const min = Math.floor(remaining / 60000);
         const sec = Math.floor((remaining % 60000) / 1000);
-        span.textContent = `⏳ ${min}m ${sec}s`;
+        span.textContent = `Left: ${min}m ${sec}s`;
       });
     });
   });
 }
 
-// Старт
 loadLimits();
-
