@@ -4,10 +4,17 @@ let startTime = null;
 let siteTimers = {};
 let intervalId = null;
 
+// Инициализация
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({ siteLimits: {}, siteEnabled: {} });
+  chrome.storage.local.get(["siteLimits", "siteEnabled"], (data) => {
+    chrome.storage.local.set({
+      siteLimits: data.siteLimits || {},
+      siteEnabled: data.siteEnabled || {}
+    });
+  });
 });
 
+// Получаем домен
 function getDomain(url) {
   try {
     return new URL(url).origin;
@@ -16,16 +23,22 @@ function getDomain(url) {
   }
 }
 
-function updateActiveTab(tab) {
-  const domain = getDomain(tab.url);
-  if (!domain) return;
-
+// Сохраняем прошедшее время
+function saveElapsedTime() {
   if (currentDomain && startTime) {
     const now = Date.now();
     const elapsed = now - startTime;
     if (!siteTimers[currentDomain]) siteTimers[currentDomain] = 0;
     siteTimers[currentDomain] += elapsed;
   }
+}
+
+// Обновление активной вкладки
+function updateActiveTab(tab) {
+  const domain = getDomain(tab.url);
+  if (!domain) return;
+
+  saveElapsedTime();
 
   currentTabId = tab.id;
   currentDomain = domain;
@@ -34,6 +47,7 @@ function updateActiveTab(tab) {
   startInterval();
 }
 
+// Запуск отслеживания
 function startInterval() {
   if (intervalId) clearInterval(intervalId);
   intervalId = setInterval(() => {
@@ -42,6 +56,7 @@ function startInterval() {
     chrome.storage.local.get(["siteLimits", "siteEnabled"], (data) => {
       const limitMinutes = data.siteLimits?.[currentDomain];
       const enabled = data.siteEnabled?.[currentDomain];
+
       if (!limitMinutes || enabled === false) return;
 
       const now = Date.now();
@@ -58,6 +73,7 @@ function startInterval() {
   }, 1000);
 }
 
+// Слушатели вкладок и окон
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.tabs.get(tabId, updateActiveTab);
 });
@@ -75,7 +91,7 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
   });
 });
 
-// Отдаём usage и enabled по запросу
+// Сообщение от popup.js для получения usage
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "getUsage") {
     const now = Date.now();
