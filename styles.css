@@ -85,3 +85,40 @@ li span {
   white-space: nowrap;
   max-width: 200px;
 }
+
+.siteLabel {
+  flex: 1;
+  color: #fff;
+}
+
+.toggleSwitch {
+  width: 40px;
+  height: 20px;
+  appearance: none;
+  background: #ccc;
+  border-radius: 20px;
+  position: relative;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.toggleSwitch:checked {
+  background: #6c63ff;
+}
+
+.toggleSwitch::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s;
+}
+
+.toggleSwitch:checked::before {
+  transform: translateX(20px);
+}

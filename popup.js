@@ -3,29 +3,15 @@ const timeInput = document.getElementById("timeInput");
 const addBtn = document.getElementById("addBtn");
 const siteList = document.getElementById("siteList");
 
-// Загрузка сохранённых лимитов
+// Загружаем лимиты
 chrome.storage.local.get(["siteLimits"], (result) => {
   const limits = result.siteLimits || {};
   updateList(limits);
 });
 
-// Преобразует ввод в origin (например, https://example.com)
-function normalizeSite(input) {
-  try {
-    if (!input.startsWith("http")) {
-      input = "https://" + input;
-    }
-    const url = new URL(input);
-    return url.origin;
-  } catch {
-    return null;
-  }
-}
-
-// Добавление нового лимита
 addBtn.addEventListener("click", () => {
   const raw = siteInput.value.trim();
-  const site = normalizeSite(raw);
+  const site = raw.replace(/^https?:\/\//, "").split("/")[0];
   const time = parseInt(timeInput.value);
 
   if (!site || isNaN(time) || time <= 0) {
@@ -44,23 +30,40 @@ addBtn.addEventListener("click", () => {
   });
 });
 
-// Отображение списка лимитов
 function updateList(limits) {
   siteList.innerHTML = "";
   for (const [site, time] of Object.entries(limits)) {
     const li = document.createElement("li");
-    li.innerHTML = `<span><strong>${site}</strong>: ${time} min</span>
-      <button data-site="${site}" class="removeBtn">✕</button>`;
+
+    const toggle = document.createElement("input");
+    toggle.type = "checkbox";
+    toggle.checked = true;
+    toggle.className = "toggleSwitch";
+    toggle.dataset.site = site;
+
+    const label = document.createElement("label");
+    label.className = "siteLabel";
+    label.innerHTML = `<strong>${site}</strong><br><small>${time} min / day</small>`;
+
+    li.appendChild(label);
+    li.appendChild(toggle);
     siteList.appendChild(li);
   }
 
-  // Кнопки удаления
-  document.querySelectorAll(".removeBtn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const siteToRemove = e.target.dataset.site;
+  document.querySelectorAll(".toggleSwitch").forEach((checkbox) => {
+    checkbox.addEventListener("change", (e) => {
+      const site = e.target.dataset.site;
+
       chrome.storage.local.get(["siteLimits"], (result) => {
         const limits = result.siteLimits || {};
-        delete limits[siteToRemove];
+
+        if (e.target.checked) {
+          // Включаем обратно (например, 10 мин)
+          limits[site] = limits[site] || 10;
+        } else {
+          delete limits[site];
+        }
+
         chrome.storage.local.set({ siteLimits: limits }, () => {
           updateList(limits);
         });
