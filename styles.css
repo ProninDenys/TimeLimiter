@@ -78,3 +78,10 @@ li {
   justify-content: space-between;
   align-items: center;
 }
+
+li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}

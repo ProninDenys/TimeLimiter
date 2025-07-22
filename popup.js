@@ -4,14 +4,15 @@ const addBtn = document.getElementById("addBtn");
 const siteList = document.getElementById("siteList");
 
 // Загрузка сохранённых лимитов
-chrome.storage.local.get(["limits"], (result) => {
-  const limits = result.limits || {};
+chrome.storage.local.get(["siteLimits"], (result) => {
+  const limits = result.siteLimits || {};
   updateList(limits);
 });
 
 // Добавление нового лимита
 addBtn.addEventListener("click", () => {
-  const site = siteInput.value.trim();
+  const raw = siteInput.value.trim();
+  const site = raw.replace(/^https?:\/\//, "").split("/")[0];
   const time = parseInt(timeInput.value);
 
   if (!site || isNaN(time) || time <= 0) {
@@ -19,10 +20,10 @@ addBtn.addEventListener("click", () => {
     return;
   }
 
-  chrome.storage.local.get(["limits"], (result) => {
-    const limits = result.limits || {};
+  chrome.storage.local.get(["siteLimits"], (result) => {
+    const limits = result.siteLimits || {};
     limits[site] = time;
-    chrome.storage.local.set({ limits }, () => {
+    chrome.storage.local.set({ siteLimits: limits }, () => {
       updateList(limits);
       siteInput.value = "";
       timeInput.value = "";
@@ -44,10 +45,10 @@ function updateList(limits) {
   document.querySelectorAll(".removeBtn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const siteToRemove = e.target.dataset.site;
-      chrome.storage.local.get(["limits"], (result) => {
-        const limits = result.limits || {};
+      chrome.storage.local.get(["siteLimits"], (result) => {
+        const limits = result.siteLimits || {};
         delete limits[siteToRemove];
-        chrome.storage.local.set({ limits }, () => {
+        chrome.storage.local.set({ siteLimits: limits }, () => {
           updateList(limits);
         });
       });
