@@ -16,11 +16,10 @@
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
+  "web_accessible_resources": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
+      "resources": ["timeout.html"],
+      "matches": ["<all_urls>"]
     }
   ],
   "icons": {
