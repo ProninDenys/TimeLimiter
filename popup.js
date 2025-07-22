@@ -3,23 +3,18 @@ const timeInput = document.getElementById("timeInput");
 const addBtn = document.getElementById("addBtn");
 const siteList = document.getElementById("siteList");
 
-let limits = {};
-let enabled = {};
-let intervalId = null;
+let timerInterval;
 
-// Начальная загрузка
-loadData();
-
-function loadData() {
-  chrome.storage.local.get(["siteLimits", "siteEnabled"], (result) => {
-    limits = result.siteLimits || {};
-    enabled = result.siteEnabled || {};
-    updateList();
-    startLiveUpdate();
+// Загружаем лимиты и статусы
+function loadLimits() {
+  chrome.storage.local.get(["siteLimits", "siteEnabled"], (data) => {
+    const limits = data.siteLimits || {};
+    const enabled = data.siteEnabled || {};
+    updateList(limits, enabled);
   });
 }
 
-// Добавление нового сайта
+// Добавляем новый лимит
 addBtn.addEventListener("click", () => {
   const raw = siteInput.value.trim();
   const site = raw.replace(/^https?:\/\//, "").split("/")[0];
@@ -30,32 +25,39 @@ addBtn.addEventListener("click", () => {
     return;
   }
 
-  limits[site] = time;
-  enabled[site] = true;
+  chrome.storage.local.get(["siteLimits", "siteEnabled"], (data) => {
+    const limits = data.siteLimits || {};
+    const enabled = data.siteEnabled || {};
+    limits[site] = time;
+    enabled[site] = true;
 
-  chrome.storage.local.set({ siteLimits: limits, siteEnabled: enabled }, () => {
-    updateList();
-    siteInput.value = "";
-    timeInput.value = "";
+    chrome.storage.local.set({ siteLimits: limits, siteEnabled: enabled }, () => {
+      siteInput.value = "";
+      timeInput.value = "";
+      updateList(limits, enabled);
+    });
   });
 });
 
-// Обновление списка
-function updateList() {
+// Обновление списка сайтов
+function updateList(limits, enabledMap) {
   siteList.innerHTML = "";
 
   for (const [site, time] of Object.entries(limits)) {
-    const isEnabled = enabled[site] !== false;
+    const enabled = enabledMap?.[site] !== false;
 
     const li = document.createElement("li");
     li.innerHTML = `
-      <span><strong>${site}</strong> — ${time} min <span id="remaining-${site}">⌛ loading...</span></span>
+      <span>
+        <strong>${site}</strong> — ${time} min 
+        <span class="countdown" data-site="${site}">⏳</span>
+      </span>
       <div style="display: flex; gap: 6px; align-items: center;">
         <label class="switch">
-          <input type="checkbox" data-site="${site}" class="toggleSwitch" ${isEnabled ? "checked" : ""}>
+          <input type="checkbox" class="toggleSwitch" data-site="${site}" ${enabled ? "checked" : ""}>
           <span class="slider"></span>
         </label>
-        <button class="editBtn" data-site="${site}" data-time="${time}">✎</button>
+        <button class="editBtn" data-site="${site}" data-time="${time}">✏️</button>
       </div>
     `;
     siteList.appendChild(li);
@@ -65,39 +67,57 @@ function updateList() {
   document.querySelectorAll(".toggleSwitch").forEach((toggle) => {
     toggle.addEventListener("change", (e) => {
       const site = e.target.dataset.site;
-      const val = e.target.checked;
-      enabled[site] = val;
-      chrome.storage.local.set({ siteEnabled: enabled });
+      const isEnabled = e.target.checked;
+
+      chrome.storage.local.get("siteEnabled", (res) => {
+        const updated = res.siteEnabled || {};
+        updated[site] = isEnabled;
+        chrome.storage.local.set({ siteEnabled: updated });
+      });
     });
   });
 
-  // Обработчик редактирования
+  // Обработчик редактирования лимита
   document.querySelectorAll(".editBtn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const site = e.target.dataset.site;
       const current = parseInt(e.target.dataset.time);
       const newTime = prompt(`Edit time limit for ${site} (min):`, current);
       if (newTime && !isNaN(parseInt(newTime))) {
-        limits[site] = parseInt(newTime);
-        chrome.storage.local.set({ siteLimits: limits }, updateList);
+        chrome.storage.local.get("siteLimits", (result) => {
+          const limits = result.siteLimits || {};
+          limits[site] = parseInt(newTime);
+          chrome.storage.local.set({ siteLimits: limits }, () => {
+            loadLimits();
+          });
+        });
       }
+    });
+  });
+
+  // Обновляем таймер
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimers, 1000);
+}
+
+// Обновление таймера для всех сайтов
+function updateTimers() {
+  document.querySelectorAll(".countdown").forEach((span) => {
+    const site = span.dataset.site;
+    chrome.runtime.sendMessage({ type: "getUsage", domain: site }, (res) => {
+      chrome.storage.local.get("siteLimits", (data) => {
+        const limitMin = data.siteLimits?.[site];
+        if (!limitMin) return;
+
+        const used = res?.used || 0;
+        const remaining = Math.max(0, limitMin * 60 * 1000 - used);
+        const min = Math.floor(remaining / 60000);
+        const sec = Math.floor((remaining % 60000) / 1000);
+        span.textContent = `⏳ ${min}m ${sec}s`;
+      });
     });
   });
 }
 
-// Живой таймер
-function startLiveUpdate() {
-  if (intervalId) clearInterval(intervalId);
-  intervalId = setInterval(() => {
-    for (const site of Object.keys(limits)) {
-      chrome.runtime.sendMessage({ type: "getUsage", domain: "https://" + site }, (res) => {
-        const remainingMs = (limits[site] * 60000) - (res?.used || 0);
-        const min = Math.max(0, Math.floor(remainingMs / 60000));
-        const sec = Math.max(0, Math.floor((remainingMs % 60000) / 1000));
-        const display = `${min}m ${sec}s left`;
-        const elem = document.getElementById(`remaining-${site}`);
-        if (elem) elem.textContent = `⌛ ${display}`;
-      });
-    }
-  }, 1000);
-}
+// Старт
+loadLimits();
