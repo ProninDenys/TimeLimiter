@@ -5,7 +5,7 @@ let siteTimers = {};
 let intervalId = null;
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({ siteLimits: {} });
+  chrome.storage.local.set({ siteLimits: {}, siteEnabled: {} });
 });
 
 function getDomain(url) {
@@ -16,7 +16,6 @@ function getDomain(url) {
   }
 }
 
-// Обновляем активную вкладку
 function updateActiveTab(tab) {
   const domain = getDomain(tab.url);
   if (!domain) return;
@@ -35,22 +34,21 @@ function updateActiveTab(tab) {
   startInterval();
 }
 
-// Таймер: проверка каждую секунду
 function startInterval() {
   if (intervalId) clearInterval(intervalId);
   intervalId = setInterval(() => {
     if (!currentDomain || !startTime) return;
 
-    chrome.storage.local.get('siteLimits', (data) => {
+    chrome.storage.local.get(["siteLimits", "siteEnabled"], (data) => {
       const limitMinutes = data.siteLimits?.[currentDomain];
-      if (!limitMinutes) return;
+      const enabled = data.siteEnabled?.[currentDomain];
+      if (!limitMinutes || enabled === false) return;
 
       const now = Date.now();
       const elapsed = now - startTime;
       const totalUsed = (siteTimers[currentDomain] || 0) + elapsed;
 
       if (totalUsed >= limitMinutes * 60 * 1000) {
-        // Превышен лимит — блокируем
         clearInterval(intervalId);
         chrome.tabs.update(currentTabId, {
           url: chrome.runtime.getURL("timeout.html")
@@ -60,22 +58,30 @@ function startInterval() {
   }, 1000);
 }
 
-// При переключении вкладок
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.tabs.get(tabId, updateActiveTab);
 });
 
-// При обновлении вкладки
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (tab.active && changeInfo.status === 'complete') {
     updateActiveTab(tab);
   }
 });
 
-// При смене окна
 chrome.windows.onFocusChanged.addListener((windowId) => {
   if (windowId === chrome.windows.WINDOW_ID_NONE) return;
   chrome.tabs.query({ active: true, windowId }, (tabs) => {
     if (tabs[0]) updateActiveTab(tabs[0]);
   });
+});
+
+// Отдаём usage и enabled по запросу
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "getUsage") {
+    const now = Date.now();
+    const domain = message.domain;
+    const used = (siteTimers[domain] || 0) + ((domain === currentDomain) ? (now - startTime) : 0);
+    sendResponse({ used });
+    return true;
+  }
 });
