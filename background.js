@@ -1,56 +1,69 @@
-let activeTabUrl = null;
-let usage = {};
-let limits = {};
-
-function extractDomain(url) {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
-}
-
-function checkLimit(domain) {
-  if (!limits[domain]) return;
-  if (!usage[domain]) usage[domain] = 0;
-
-  if (usage[domain] >= limits[domain]) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0] && extractDomain(tabs[0].url) === domain) {
-        chrome.tabs.update(tabs[0].id, { url: chrome.runtime.getURL("timeout.html") });
-      }
-    });
-  }
-}
+let activeTabId = null;
+let siteTimers = {};
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get(["limits"], (result) => {
-    limits = result.limits || {};
+  chrome.storage.local.set({ siteLimits: {} });
+});
+
+// Отслеживаем вкладку
+chrome.tabs.onActivated.addListener(activeInfo => {
+  chrome.tabs.get(activeInfo.tabId, tab => {
+    handleTab(tab);
   });
 });
 
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.limits) {
-    limits = changes.limits.newValue || {};
-  }
-});
-
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  const tab = await chrome.tabs.get(activeInfo.tabId);
-  activeTabUrl = extractDomain(tab.url);
-});
-
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete") {
-    activeTabUrl = extractDomain(tab.url);
+  if (tab.active && changeInfo.status === 'complete') {
+    handleTab(tab);
   }
 });
 
-setInterval(() => {
-  if (!activeTabUrl) return;
-  if (!limits[activeTabUrl]) return;
+function handleTab(tab) {
+  const url = new URL(tab.url);
+  const domain = url.origin;
 
-  usage[activeTabUrl] = (usage[activeTabUrl] || 0) + 1; 
-  checkLimit(activeTabUrl);
-}, 60 * 1000); 
+  chrome.storage.local.get('siteLimits', data => {
+    const limits = data.siteLimits || {};
+    const limit = limits[domain];
+    if (!limit) return;
+
+    const now = Date.now();
+    if (!siteTimers[domain]) {
+      siteTimers[domain] = {
+        startTime: now,
+        usedTime: 0
+      };
+    }
+
+    const elapsed = now - siteTimers[domain].startTime;
+    const totalUsed = siteTimers[domain].usedTime + elapsed;
+
+    if (totalUsed >= limit * 60 * 1000) {
+      // Время превышено — перенаправим или закроем
+      chrome.tabs.update(tab.id, {
+        url: chrome.runtime.getURL("timeout.html")
+      });
+    }
+  });
+}
+
+// Когда вкладка неактивна — сохраняем использованное время
+chrome.tabs.onActivated.addListener(() => updateTimers());
+chrome.windows.onFocusChanged.addListener(() => updateTimers());
+
+function updateTimers() {
+  chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+    const tab = tabs[0];
+    if (!tab || !tab.url) return;
+
+    const url = new URL(tab.url);
+    const domain = url.origin;
+
+    if (siteTimers[domain]) {
+      const now = Date.now();
+      const elapsed = now - siteTimers[domain].startTime;
+      siteTimers[domain].usedTime += elapsed;
+      siteTimers[domain].startTime = now;
+    }
+  });
+}
