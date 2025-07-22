@@ -48,18 +48,21 @@ function updateList(limits, enabledMap) {
 
     const li = document.createElement("li");
     li.innerHTML = `
-      <span>
-        <strong>${site}</strong> — ${time} min 
-        <span class="countdown" data-site="${site}">⏳</span>
-      </span>
-      <div style="display: flex; gap: 6px; align-items: center;">
-        <label class="switch">
-          <input type="checkbox" class="toggleSwitch" data-site="${site}" ${enabled ? "checked" : ""}>
-          <span class="slider"></span>
-        </label>
-        <button class="editBtn" data-site="${site}" data-time="${time}">✏️</button>
-      </div>
-    `;
+  <div class="site-block">
+    <div class="site-info">
+      <div><strong>${site}</strong></div>
+      <div class="limit-line">Limit: ${time} min</div>
+      <div class="limit-line" id="remaining-${site}">Left: ...</div>
+    </div>
+    <div class="site-controls">
+      <label class="switch">
+        <input type="checkbox" data-site="${site}" class="toggleSwitch" ${isDisabled ? "" : "checked"}>
+        <span class="slider"></span>
+      </label>
+      <button class="editBtn" data-site="${site}" data-time="${time}">✏️</button>
+    </div>
+  </div>
+`;
     siteList.appendChild(li);
   }
 
@@ -121,3 +124,4 @@ function updateTimers() {
 
 // Старт
 loadLimits();
+

@@ -166,3 +166,31 @@ input:checked + .slider:before {
 .editBtn:hover {
   background-color: #574fcb;
 }
+
+.site-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.limit-line {
+  font-size: 12px;
+  color: #bbb;
+  margin-top: 2px;
+}
+
+.site-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+}
